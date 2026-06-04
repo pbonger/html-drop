@@ -17,9 +17,13 @@ if [ -n "$APP_PATH" ] && [ -d "$APP_PATH" ]; then
   # Kill any stale extension process so macOS loads the new version immediately
   pkill -f HTMLDropExtension 2>/dev/null || true
 
+  # Clear icon cache so the new icon appears in Finder Share menu immediately
+  rm -rf /Library/Caches/com.apple.iconservices.store 2>/dev/null || true
+  sudo -u "$CURRENT_USER" killall Dock 2>/dev/null || true
+
   # Open once as the real user to register the Share extension
   sudo -u "$CURRENT_USER" open "$APP_PATH"
-  sleep 2
+  sleep 3
   sudo -u "$CURRENT_USER" pluginkit -e use -i com.pbonger.html-drop-app.extension 2>/dev/null || true
 fi
 

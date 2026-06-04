@@ -14,6 +14,17 @@ class ShareViewController: NSViewController {
     override func beginRequest(with context: NSExtensionContext) {
         os_log("beginRequest: items=%d", log: log, context.inputItems.count)
 
+        // Small delay on first invocation — extension process may not be fully warm yet
+        let delay = hasWarmedUp ? 0 : 150
+        hasWarmedUp = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(delay)) {
+            self.beginRequestAfterWarmup(context: context)
+        }
+    }
+
+    private var hasWarmedUp = false
+
+    private func beginRequestAfterWarmup(context: NSExtensionContext) {
         guard let item = context.inputItems.first as? NSExtensionItem else {
             os_log("beginRequest: no NSExtensionItem", log: log)
             DispatchQueue.main.async { self.showError("No extension item", context: context) }
