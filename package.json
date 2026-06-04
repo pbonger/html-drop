@@ -1,6 +1,6 @@
 {
   "name": "html-drop-plugin",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "WebStorm plugin — right-click any HTML file to share on HTML Drop",
   "scripts": {
     "install": "brew install openjdk@21 gradle gh || true && gh auth login && gradle wrapper --gradle-version 8.8 && npx wrangler login",
@@ -13,7 +13,7 @@
     "package:all": "VERSION=$(node -p \"require('./package.json').version\") && npm run package:pkg && mkdir -p build/release && cp build/distributions/html-drop-plugin-*.zip build/release/ && cp build/HTMLDrop.pkg build/release/ && cp INSTALL.md build/release/README.md && (cd build/release && zip -r ../html-drop-v$VERSION.zip . --exclude '*/.DS_Store' --exclude '*/_CodeSignature/*') && rm -rf build/release build/HTMLDrop.pkg",
     "package:dmg": "mkdir -p build && bash scripts/package-dmg.sh",
     "release": "git diff --quiet && git diff --cached --quiet || (echo 'Working tree is not clean. Commit or stash your changes first.' && exit 1) && git checkout master && git merge develop --no-edit && npm version patch && VERSION=$(node -p \"require('./package.json').version\") && sed -i '' \"s/version = \\\"[^\\\"]*\\\"/version = \\\"$VERSION\\\"/\" build.gradle.kts && git add build.gradle.kts && git commit --amend --no-edit && git push && git push --tags && rm -rf build && npm run build && npm run build:app && npm run package:dmg && gh release create v$VERSION build/HTMLDrop-v$VERSION.dmg --title \"HTML Drop v$VERSION\" --generate-notes && npm run worker:deploy && git checkout develop && git merge --ff-only master && git push",
-    "worker:init":  "wrangler kv namespace create PAGES && wrangler kv namespace create PAGES --preview",
+    "worker:init": "wrangler kv namespace create PAGES && wrangler kv namespace create PAGES --preview",
     "worker:pages": "wrangler kv key list --binding PAGES --remote --config worker/wrangler.toml | node -e \"const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));const now=Date.now()/1000;d.sort((a,b)=>b.expiration-a.expiration);d.forEach(k=>{const id=k.name.replace('page:','');const left=k.expiration-now;const h=Math.floor(left/3600);const m=Math.floor((left%3600)/60);console.log('https://html-drop.studio-bonkers.nl/'+id,'  '+h+'h '+m+'m left')})\"",
     "worker:purge": "wrangler kv key list --binding PAGES --preview false --remote --config worker/wrangler.toml | node -e \"const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));require('fs').writeFileSync('/tmp/kv-keys.json',JSON.stringify(d.map(k=>({name:k.name}))))\" && wrangler kv bulk delete --binding PAGES --preview false --remote --config worker/wrangler.toml /tmp/kv-keys.json",
     "worker:inspect": "node scripts/kv-inspect.js",
