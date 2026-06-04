@@ -80,7 +80,10 @@ class ShareOnHTMLDropAction : AnAction() {
                 if (attempt < retryDelays.size) continue
                 error("Rate limited — please try again later")
             }
-            check(res.statusCode() in 200..299) { "HTML Drop ${res.statusCode()}: ${res.body()}" }
+            if (res.statusCode() !in 200..299) {
+                val message = Regex(""""error"\s*:\s*"([^"]+)"""").find(res.body())?.groupValues?.get(1) ?: res.body()
+                error(message)
+            }
             return Regex(""""url"\s*:\s*"([^"]+)"""").find(res.body())?.groupValues?.get(1)
                 ?: error("No URL in response: ${res.body()}")
         }

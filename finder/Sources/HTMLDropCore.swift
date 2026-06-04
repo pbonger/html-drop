@@ -26,7 +26,9 @@ func htmlDropUpload(_ html: String, password: String = "") throws -> String {
             throw Fail("Rate limited — please try again later")
         }
         guard (200...299).contains(status) else {
-            throw Fail("HTML Drop \(status): \(String(data: data, encoding: .utf8) ?? "")")
+            let body = String(data: data, encoding: .utf8) ?? ""
+            let message = jsonValue(body, key: "error") ?? body
+            throw Fail(message)
         }
         let body = String(data: data, encoding: .utf8) ?? ""
         guard let url = jsonValue(body, key: "url") else {
