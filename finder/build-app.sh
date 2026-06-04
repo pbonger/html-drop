@@ -31,6 +31,7 @@ echo "▸ Compiling extension…"
   -sdk "$SDK" -target "$TARGET" \
   -module-name "$EXT_NAME" \
   -parse-as-library \
+  "$DIR/Sources/GeneratedConstants.swift" \
   "$DIR/Sources/HTMLDropCore.swift" \
   "$DIR/Extension/ShareViewController.swift" \
   "$TMP/Config.swift" \

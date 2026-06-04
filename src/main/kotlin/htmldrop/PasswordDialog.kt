@@ -6,9 +6,10 @@ import com.intellij.ui.components.JBPasswordField
 import com.intellij.ui.dsl.builder.AlignX
 import com.intellij.ui.dsl.builder.panel
 import com.intellij.util.ui.JBUI
+import java.awt.Color
 import javax.swing.JComponent
 
-class PasswordDialog(private val filename: String) : DialogWrapper(true) {
+class PasswordDialog(private val filename: String, private val fileSizeBytes: Long) : DialogWrapper(true) {
     private val field = JBPasswordField().apply {
         emptyText.text = "Leave blank to share without a password"
         columns = 28
@@ -22,7 +23,12 @@ class PasswordDialog(private val filename: String) : DialogWrapper(true) {
 
     override fun createCenterPanel(): JComponent = panel {
         row {
-            val label = JBLabel(filename)
+            val sizeKb = fileSizeBytes / 1024
+            val sizeLabel = if (fileSizeBytes < 1024 * 1024)
+                "$filename  (${sizeKb} KB)"
+            else
+                "$filename  (${"%.1f".format(fileSizeBytes / 1024.0 / 1024.0)} MB)"
+            val label = JBLabel(sizeLabel)
             label.foreground = JBUI.CurrentTheme.ContextHelp.FOREGROUND
             cell(label)
         }

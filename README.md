@@ -1,63 +1,116 @@
 # HTML Drop
 
 Right-click any `.html` file → **Share on HTML Drop**.  
-Uploads to [pagedrop.io](https://pagedrop.io), copies the URL to clipboard, and shows a notification.  
-Optionally password-protects the page with client-side AES-256 encryption.
+Uploads to [html-drop.studio-bonkers.nl](https://html-drop.studio-bonkers.nl), copies the URL to clipboard, and shows a notification. Optionally password-protects the page with server-side AES-256-GCM encryption. Pages expire after 3 days.
 
-Available as a **WebStorm plugin** and a **macOS Finder Quick Action**.
+Available as a **WebStorm plugin** and a **macOS Finder Share Extension**.
 
-## Finder (macOS Share menu)
+---
 
-1. Download `html-drop-v*.zip` from the [latest release](../../releases/latest) and unzip it.
-2. Double-click **`HTMLDrop.pkg`** and click through the installer.
-3. If macOS blocks it: click Done to dismiss, then go to **System Settings → Privacy & Security → Open Anyway** next to HTMLDrop.pkg.
-4. Right-click any `.html` file in Finder → **Share** → **HTML Drop**.
+## What's in the repo
 
-> The installer handles everything — no Terminal needed.
+| Path | What it is |
+|---|---|
+| `worker/` | Cloudflare Worker — the backend (upload, serve, delete, terms) |
+| `src/main/kotlin/htmldrop/` | WebStorm plugin (Kotlin) |
+| `finder/Sources/` | Swift CLI used by the Finder Quick Action |
+| `finder/Extension/` | macOS Share Extension (Finder Share button) |
+| `finder/App/` | Minimal host app carrying the Share Extension |
+| `finder/HTMLDrop.workflow/` | Automator Quick Action → `~/Library/Services/` |
+| `finder/build-app.sh` | Compiles + bundles + signs `HTMLDrop.app` |
+| `scripts/sync-config.js` | Generates platform constants from `settings.json` |
+| `scripts/package-dmg.sh` | Builds `.pkg`, assembles DMG |
+| `settings.json` | Shared config — upload URL and size cap |
 
-See [finder/README.md](finder/README.md) for build-from-source instructions.
+---
+
+## Shared config (`settings.json`)
+
+Single source of truth for all clients and the worker:
+
+```json
+{
+  "uploadUrl": "https://html-drop.studio-bonkers.nl/api/upload",
+  "maxUploadMb": 3
+}
+```
+
+Running `npm run sync` generates typed constants for each platform:
+- `worker/config.js` (JS)
+- `src/main/kotlin/htmldrop/Constants.kt` (Kotlin)
+- `finder/Sources/GeneratedConstants.swift` (Swift)
+
+---
+
+## npm scripts
+
+```bash
+npm run sync           # regenerate platform constants from settings.json
+npm run build          # sync + compile WebStorm plugin → build/distributions/
+npm run build:app      # compile + bundle + sign HTMLDrop.app
+npm run update:app     # build:app, install to /Applications, re-register extension
+npm run icon           # regenerate all icons from source
+npm run package:dmg    # build .pkg and assemble final DMG
+npm run release        # bump version, build everything, push to GitHub Releases
+
+npm run worker:dev     # run worker locally at localhost:8787
+npm run worker:deploy  # sync + deploy worker to Cloudflare
+npm run worker:logs    # tail live worker logs
+npm run worker:init    # create KV namespaces (first-time setup)
+```
+
+---
+
+## Worker (Cloudflare)
+
+Deployed at `html-drop.studio-bonkers.nl`. Handles all upload, serve, and delete logic.
+
+- **POST `/api/upload`** — accepts `{html, password?, ttl?}`, max 3 MB
+- **GET `/{uuid}`** — serves the page; injects delete/abuse/terms footer
+- **GET `/delete/{uuid}?token=`** — permanent delete with single confirm
+- **GET `/terms`** — terms of use
+- **GET `/favicon.png`**, `/icon.png`**, `/apple-touch-icon.png`** — icons
+
+Password-protected pages are encrypted server-side (PBKDF2-HMAC-SHA256 + AES-256-GCM). The server never stores the password; decryption happens in the browser.
+
+### First-time deploy
+
+```bash
+npm install
+npm run worker:init   # creates KV namespace, patches wrangler.toml
+npm run worker:deploy
+```
 
 ---
 
 ## WebStorm Plugin
 
-### Setup
+Right-click `.html` → **Share on HTML Drop** → optional password → uploads, copies URL, notification with **Open in Browser**.
 
-Requires Node.js and Homebrew. Java 21+ is required — `npm install` handles it automatically.
+File size is validated before the dialog opens — files over 3 MB are rejected immediately.
 
-```bash
-git clone <this repo>
-cd html-drop-plugin
-npm install   # installs Gradle + JDK if missing, generates the Gradle wrapper
-```
-
-### Build
+### Build and install
 
 ```bash
 npm run build
+# WebStorm → Settings → Plugins → ⚙️ → Install Plugin from Disk → build/distributions/*.zip
 ```
 
-Output: `build/distributions/html-drop-plugin-1.0.9.zip`
+---
 
-### Install in WebStorm
+## macOS Share Extension
 
-1. WebStorm → Settings → Plugins
-2. Click the gear icon → **Install Plugin from Disk**
-3. Select the `.zip` from `build/distributions/`
-4. Restart WebStorm
+Right-click `.html` in Finder → **Share** → **HTML Drop**.
 
-Right-click any `.html` file → **Share on HTML Drop**.
-
-### Update
-
-After pulling changes:
+### Build and install
 
 ```bash
-npm run build
+npm run update:app
 ```
 
-Then reinstall the new `.zip` via Settings → Plugins → gear → **Install Plugin from Disk**.  
-WebStorm will prompt to replace the existing version.
+### Entitlements (sandboxed)
+- `com.apple.security.network.client` — upload to worker
+- `com.apple.security.files.user-selected.read-only` — read the `.html` file
 
 ---
 
@@ -67,4 +120,4 @@ WebStorm will prompt to replace the existing version.
 npm run release
 ```
 
-Bumps the patch version, builds the WebStorm plugin and Finder workflow (with binary embedded), and creates a GitHub release with both zips attached.
+Bumps patch version, builds plugin and app, creates a GitHub release with the DMG attached.

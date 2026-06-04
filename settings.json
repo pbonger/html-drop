@@ -1,3 +1,4 @@
 {
-  "provider": "freekit"
+  "uploadUrl": "https://html-drop.studio-bonkers.nl/api/upload",
+  "maxUploadMb": 3
 }

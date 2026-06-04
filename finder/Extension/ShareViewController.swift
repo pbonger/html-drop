@@ -158,8 +158,7 @@ class ShareViewController: NSViewController {
     private func upload(html: String, password: String, context: NSExtensionContext) {
         DispatchQueue.global().async {
             do {
-                let service = UploadService.named(currentProvider) ?? .freekit
-                let siteUrl = try htmlDropUpload(html, password: password, service: service)
+                let siteUrl = try htmlDropUpload(html, password: password)
                 copyToClipboard(siteUrl)
                 DispatchQueue.main.async { self.showSuccess(siteUrl, context: context) }
             } catch {

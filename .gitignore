@@ -11,6 +11,10 @@ finder/HTMLDrop.workflow/Contents/MacOS/html-drop
 finder/HTMLDrop.workflow/Contents/Resources/
 finder/icon.icns
 
+# Generated from settings.json (npm run sync)
+src/main/kotlin/htmldrop/Constants.kt
+finder/Sources/GeneratedConstants.swift
+
 # Generated icons (npm run icon)
 src/main/resources/META-INF/pluginIcon.png
 src/main/resources/META-INF/pluginIcon@2x.png
@@ -18,3 +22,4 @@ src/main/resources/icons/icon16.png
 src/main/resources/icons/icon16@2x.png
 src/main/resources/icons/icon16_dark.png
 src/main/resources/icons/icon16_dark@2x.png
+/node_modules/

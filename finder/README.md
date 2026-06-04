@@ -1,33 +1,41 @@
 # HTML Drop — Finder Quick Action
 
-Right-click any `.html` file in Finder → **Share on HTML Drop**.  
-Uploads to pagedrop.io, copies the URL to clipboard, and shows a macOS notification.
+Right-click any `.html` file in Finder → **Share** → **HTML Drop**.  
+Uploads to [html-drop.studio-bonkers.nl](https://html-drop.studio-bonkers.nl), copies the URL to clipboard, shows a macOS notification.
 
 ## Install
 
-1. Download `HTMLDrop.workflow.zip` from the [latest release](https://github.com/pbonger/html-drop-plugin/releases/latest).
-2. Unzip — you'll get `HTMLDrop.workflow`.
-3. Double-click `HTMLDrop.workflow` — Automator opens and asks to install it as a Quick Action.  
-   Click **Install**.
+```bash
+npm run update:app
+```
 
-> **Gatekeeper warning?** If macOS says the file is from an unidentified developer, right-click → Open instead of double-clicking, then click Open again in the dialog.
-
-## Usage
-
-Right-click any `.html` file in Finder → **Services → Share on HTML Drop** (or just **Share on HTML Drop** if it appears at the top level of the context menu).
-
-After upload the URL is copied to your clipboard and a notification appears.
-
-## Uninstall
-
-Open **System Settings → Privacy & Security → Extensions → Finder Extensions** (or search for "Services" in System Settings), find HTMLDrop, and remove it.  
-Or delete `~/Library/Services/HTMLDrop.workflow` directly.
+Or install from the release DMG — double-click `HTMLDrop.pkg` and follow the installer.
 
 ## Build from source
 
 ```bash
 git clone <this repo>
 cd html-drop-plugin
-npm run build:finder    # compiles and copies binary into the workflow bundle
-npm run package:finder  # zips to build/distributions/HTMLDrop.workflow.zip
+npm install
+npm run build:app    # compiles Swift, bundles HTMLDrop.app
+npm run update:app   # build + install to /Applications + re-register extension
 ```
+
+## Architecture
+
+```
+HTMLDrop.app/
+  Contents/
+    MacOS/HTMLDrop                  ← stub host app (quits immediately after registering extension)
+    PlugIns/
+      HTMLDropExtension.appex/      ← Share Extension (shown in Finder Share menu)
+```
+
+**`finder/Extension/ShareViewController.swift`** — handles the share sheet, size check, password dialog, upload  
+**`finder/Sources/HTMLDropCore.swift`** — upload function, helpers  
+**`finder/Sources/GeneratedConstants.swift`** — generated from `settings.json` (upload URL, max size)  
+**`finder/App/main.swift`** — stub host, registers extension then quits  
+
+## Uninstall
+
+Delete `/Applications/HTMLDrop.app` or open **System Settings → Privacy & Security → Extensions → Finder Extensions** and remove HTMLDrop.

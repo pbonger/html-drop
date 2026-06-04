@@ -83,9 +83,8 @@ guard let password = confirmShare() else { exit(0) }
 
 do {
     notify("HTML Drop", "Uploading…")
-    let html    = try String(contentsOfFile: filePath, encoding: .utf8)
-    let service = findService(startingAt: filePath)
-    let url     = try htmlDropUpload(html, password: password, service: service)
+    let html = try String(contentsOfFile: filePath, encoding: .utf8)
+    let url  = try htmlDropUpload(html, password: password)
     copyToClipboard(url)
     notify("Shared on HTML Drop",
            password.isEmpty ? "URL copied to clipboard" : "URL copied to clipboard (password protected)",

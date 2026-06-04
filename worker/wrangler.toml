@@ -1,0 +1,12 @@
+name               = "html-drop"
+main               = "index.js"
+compatibility_date = "2024-09-23"
+
+[[routes]]
+pattern     = "html-drop.studio-bonkers.nl"
+custom_domain = true
+
+[[kv_namespaces]]
+binding    = "PAGES"
+id         = "78f38497b30346d69a273b9453c2e58f"
+preview_id = "70f17e0599724e7594a4ece45ab6acc1"
