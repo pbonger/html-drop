@@ -58,6 +58,20 @@ async function upload(request, env) {
 
   const { html, password } = body;
 
+  const rawIp = request.headers.get('cf-connecting-ip') ?? 'unknown';
+  const ip    = rawIp.includes(':') ? ipv6Prefix(rawIp) : rawIp;
+
+  const blockRaw = await env.PAGES.get(`block:${ip}`);
+  const blockVal = blockRaw !== null ? parseInt(blockRaw) : null;
+  if (blockVal === 1) return err(403, 'You are blocked from uploading');
+
+  const strike = async (reason) => {
+    const current = await env.PAGES.get(`block:${ip}`);
+    const n = current !== null ? parseInt(current) : null;
+    await env.PAGES.put(`block:${ip}`, String(n === null ? 3 : n - 1));
+    return err(400, reason);
+  };
+
   if (typeof html !== 'string' || html.trim() === '') return err(400, 'html is required');
 
   const bytes = new TextEncoder().encode(html).length;
@@ -65,20 +79,36 @@ async function upload(request, env) {
 
   if (!/<[a-zA-Z]/.test(html)) return err(400, 'Content does not look like HTML');
 
+  const OBFUSCATION_PATTERNS = [
+    /eval\s*\(\s*atob\s*\(/i,
+    /eval\s*\(\s*unescape\s*\(/i,
+    /eval\s*\(\s*decodeURIComponent\s*\(/i,
+    /document\.write\s*\(\s*unescape\s*\(/i,
+    /document\.write\s*\(\s*atob\s*\(/i,
+  ];
+  if (OBFUSCATION_PATTERNS.some(p => p.test(html))) return strike('Content contains obfuscated code');
+
+  const stripped = html.replace(/data:[a-z]+\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=]+/gi, '');
+  if (/[A-Za-z0-9+/]{256,}/.test(stripped)) return strike('Content contains large encoded blocks');
+
   const id          = crypto.randomUUID();
   const deleteToken = crypto.randomUUID();
 
   let stored;
+  let pageUrl = `https://${new URL(request.url).hostname}/${id}`;
+
   if (password && typeof password === 'string' && password.length > 0) {
-    try { stored = await buildLockPage(html, password, id, deleteToken); }
+    try { stored = await buildLockPage(html, password); }
     catch { return err(500, 'Encryption failed'); }
   } else {
-    stored = html;
+    const randomKey = toB64(crypto.getRandomValues(new Uint8Array(32)));
+    try { stored = await buildLockPage(html, randomKey); }
+    catch { return err(500, 'Encryption failed'); }
+    pageUrl += `#key=${encodeURIComponent(randomKey)}`;
   }
 
-  await env.PAGES.put(`page:${id}`, JSON.stringify({ html: stored, deleteToken, isProtected: !!password, createdAt: new Date().toISOString() }), { expirationTtl: KV_TTL });
+  await env.PAGES.put(`page:${id}`, JSON.stringify({ html: stored, deleteToken, isProtected: true, createdAt: new Date().toISOString(), ip }), { expirationTtl: KV_TTL });
 
-  const pageUrl = `https://${new URL(request.url).hostname}/${id}`;
   return cors(Response.json({ url: pageUrl, deleteUrl: `${new URL(request.url).origin}/delete/${id}?token=${deleteToken}` }));
 }
 
@@ -87,8 +117,7 @@ async function serve(id, env) {
   const raw = await env.PAGES.get(`page:${id}`);
   if (!raw) return gone();
   const record = JSON.parse(raw);
-  if (record.isProtected) return html(record.html);
-  return html(injectFooter(record.html, id, record.deleteToken));
+  return html(record.html);
 }
 
 // ── GET /delete/{uuid}?token= ──────────────────────────────────────────────
@@ -122,23 +151,25 @@ a{color:#e8640a}
 </head>
 <body>
 <h1>${BRAND}</h1>
-<p class="meta">Terms of Use · Last updated June 2025</p>
+<p class="meta">Terms of Use · Last updated June 2026</p>
 <h2>1. Acceptable Use</h2>
 <p>HTML Drop is a short-lived HTML hosting service. You may use it to share HTML pages for personal and commercial purposes. You may NOT use this service to host or share content that:</p>
 <ul>
 <li>Is illegal in your jurisdiction or under Dutch law</li>
 <li>Infringes intellectual property rights</li>
 <li>Contains malware, phishing, or other malicious code</li>
+<li>Contains obfuscated or pre-encrypted code intended to conceal its purpose</li>
 <li>Harasses, threatens, or abuses others</li>
 <li>Constitutes child sexual abuse material (CSAM) — strictly prohibited</li>
 <li>Facilitates fraud or identity theft</li>
 </ul>
 <h2>2. Content Removal</h2>
-<p>All pages are automatically deleted after 3 days. Maximum page size is 3 MB. You may delete your page immediately using the delete link in the page footer. To report abusive content, email <a href="mailto:${ABUSE_EMAIL}">${ABUSE_EMAIL}</a> with the page URL.</p>
+<p>All pages are automatically deleted after 3 days. Maximum page size is 3 MB. You may delete your page immediately using the delete link provided at upload. To report abusive content, email <a href="mailto:${ABUSE_EMAIL}">${ABUSE_EMAIL}</a> with the page URL.</p>
+<p>Uploads are automatically scanned for obfuscated or pre-encoded content. Uploads that trigger these checks are rejected. Repeat offenders may have their IP address blocked.</p>
 <h2>3. No Warranty</h2>
 <p>This service is provided as-is without any warranty. We do not guarantee uptime, availability, or data retention beyond the stated 3-day TTL.</p>
 <h2>4. Privacy</h2>
-<p>We store only the HTML content you upload and a deletion token. We do not collect personal data, log IP addresses, or track users. Password-protected pages are AES-256-GCM encrypted; we cannot read their contents. All data is deleted after 3 days.</p>
+<p>We store the HTML content you upload, a deletion token, and the uploader's IP address for abuse prevention. We do not collect any other personal data or track users. All encrypted pages use AES-256-GCM; we cannot read their contents. All data is deleted after 3 days.</p>
 <h2>5. Operator</h2>
 <p>Operated by Studio Bonkers. Abuse and legal inquiries: <a href="mailto:${ABUSE_EMAIL}">${ABUSE_EMAIL}</a>.</p>
 </body>
@@ -385,6 +416,7 @@ function setFile(file) {
     showError(fmtSize(file.size) + ' exceeds the ' + MAX_MB + ' MB limit.');
     return;
   }
+  reset();
   selectedFile = file;
   dzEmpty.style.display = 'none';
   dzFile.style.display  = 'block';
@@ -392,8 +424,6 @@ function setFile(file) {
   dzSize.textContent    = fmtSize(file.size);
   dz.classList.add('has-file');
   uploadBtn.disabled = false;
-  hideError();
-  result.classList.remove('visible');
 }
 
 function showError(msg) { errorMsg.textContent = msg; errorMsg.classList.add('visible'); }
@@ -406,9 +436,16 @@ function reset() {
   dzFile.style.display  = 'none';
   dz.classList.remove('has-file');
   uploadBtn.disabled = true;
+  uploadBtn.textContent = 'Upload →';
+  uploadBtn.classList.remove('loading');
   progress.classList.remove('visible');
   progressBar.style.width = '0%';
   result.classList.remove('visible');
+  pwCheck.checked = false;
+  pwField.value = '';
+  pwField.classList.remove('visible');
+  copyBtn.textContent = 'Copy';
+  copyBtn.classList.remove('copied');
   hideError();
 }
 
@@ -481,6 +518,10 @@ uploadBtn.addEventListener('click', async () => {
       uploadBtn.disabled = true;
       uploadBtn.textContent = 'Upload →';
       uploadBtn.classList.remove('loading');
+      // Reset password
+      pwCheck.checked = false;
+      pwField.value = '';
+      pwField.classList.remove('visible');
       // Auto-copy
       navigator.clipboard?.writeText(url).catch(() => {});
       copyBtn.textContent = 'Copied!';
@@ -526,17 +567,17 @@ fetch('https://api.github.com/repos/pbonger/html-drop/releases/latest')
 
 
 // ── Encryption ─────────────────────────────────────────────────────────────
-async function buildLockPage(plainHtml, password, pageId, deleteToken) {
+async function buildLockPage(plainHtml, password) {
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const iv   = crypto.getRandomValues(new Uint8Array(12));
   const keyMaterial = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']);
   const key = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations: 100_000, hash: 'SHA-256' }, keyMaterial, { name: 'AES-GCM', length: 256 }, false, ['encrypt']);
   const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(plainHtml));
-  return lockPage(toB64(salt), toB64(new Uint8Array(iv)), toB64(new Uint8Array(ciphertext)), pageId, deleteToken);
+  return lockPage(toB64(salt), toB64(new Uint8Array(iv)), toB64(new Uint8Array(ciphertext)));
 }
 
 // ── Lock page ──────────────────────────────────────────────────────────────
-function lockPage(salt, iv, ct, pageId, deleteToken) {
+function lockPage(salt, iv, ct) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -556,54 +597,53 @@ input[type=password]:focus{border-color:#e8640a;background:#fff}
 button{margin-top:.75rem;width:100%;padding:.8rem;background:linear-gradient(90deg,#c85108,#e8640a);color:#fff;border:none;border-radius:12px;font-size:1rem;font-weight:600;cursor:pointer;transition:opacity .15s}
 button:hover{opacity:.88}
 .err{color:#dc2626;font-size:.82rem;margin-top:.6rem;display:none}
-footer{position:fixed;bottom:0;left:0;right:0;padding:8px 20px;background:rgba(0,0,0,.82);backdrop-filter:blur(8px);text-align:center;font-size:11px;color:rgba(255,255,255,.35)}
-footer a{color:rgba(255,255,255,.35);text-decoration:none;transition:color .2s}
-footer a:hover{color:rgba(255,255,255,.7)}
 </style>
 </head>
 <body>
 <div class="card">
   <img class="icon" src="/icon.png" alt="${BRAND}">
   <div class="brand">${BRAND}</div>
-  <div class="title">This page is password protected</div>
-  <div class="sub">Enter the password to unlock the content.</div>
+  <div class="title" id="t">This page is password protected</div>
+  <div class="sub" id="s">Enter the password to unlock the content.</div>
   <input type="password" id="p" placeholder="Password" autofocus>
-  <button onclick="go()">Unlock</button>
+  <button id="b" onclick="go(document.getElementById('p').value)">Unlock</button>
   <div class="err" id="e">Wrong password — try again.</div>
 </div>
-<footer>
-  <a href="/delete/${pageId}?token=${deleteToken}" onclick="return confirm('Permanently delete this page?')">delete this page</a>
-  &nbsp;·&nbsp;
-  <a href="/">report abuse</a>
-  &nbsp;·&nbsp;
-  <a href="/terms">terms</a>
-</footer>
 <script>
 const S='${salt}',I='${iv}',C='${ct}';
 const b=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
-async function go(){
+const fragKey=new URLSearchParams(location.hash.slice(1)).get('key');
+const sessKey='hd:'+location.pathname.slice(1);
+async function go(pw){
   try{
-    const km=await crypto.subtle.importKey('raw',new TextEncoder().encode(document.getElementById('p').value),'PBKDF2',false,['deriveKey']);
+    const km=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey']);
     const k=await crypto.subtle.deriveKey({name:'PBKDF2',salt:b(S),iterations:100000,hash:'SHA-256'},km,{name:'AES-GCM',length:256},false,['decrypt']);
     const plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:b(I)},k,b(C));
+    sessionStorage.setItem(sessKey,pw);
+    if(fragKey)history.replaceState(null,'',location.pathname);
     document.open();document.write(new TextDecoder().decode(plain));document.close();
-  }catch{document.getElementById('e').style.display='block';}
+  }catch{
+    sessionStorage.removeItem(sessKey);
+    document.getElementById('t').textContent='This page is password protected';
+    document.getElementById('s').textContent='Enter the password to unlock the content.';
+    document.getElementById('p').style.display='';
+    document.getElementById('b').style.display='';
+    document.getElementById('e').style.display='block';
+  }
 }
-document.getElementById('p').addEventListener('keydown',e=>{if(e.key==='Enter')go();});
+const autoKey=fragKey||sessionStorage.getItem(sessKey);
+if(autoKey){
+  document.getElementById('t').textContent='Decrypting…';
+  document.getElementById('s').textContent='Please wait.';
+  document.getElementById('p').style.display='none';
+  document.getElementById('b').style.display='none';
+  go(autoKey);
+}else{
+  document.getElementById('p').addEventListener('keydown',e=>{if(e.key==='Enter')go(document.getElementById('p').value);});
+}
 </script>
 </body>
 </html>`;
-}
-
-// ── Footer for unprotected pages ───────────────────────────────────────────
-function footerBar(pageId, deleteToken) {
-  return `<div style="position:fixed;bottom:0;left:0;right:0;padding:7px 20px;background:rgba(0,0,0,.82);backdrop-filter:blur(8px);text-align:center;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:11px;color:rgba(255,255,255,.35);z-index:2147483647"><a href="/delete/${pageId}?token=${deleteToken}" style="color:rgba(255,255,255,.35);text-decoration:none" onclick="return confirm('Permanently delete this page?')">delete this page</a>&nbsp;&nbsp;·&nbsp;&nbsp;<a href="/" style="color:rgba(255,255,255,.35);text-decoration:none">report abuse</a>&nbsp;&nbsp;·&nbsp;&nbsp;<a href="/terms" style="color:rgba(255,255,255,.35);text-decoration:none">terms</a></div>`;
-}
-
-function injectFooter(rawHtml, pageId, deleteToken) {
-  const bar = footerBar(pageId, deleteToken);
-  const idx = rawHtml.lastIndexOf('</body>');
-  return idx !== -1 ? rawHtml.slice(0, idx) + bar + rawHtml.slice(idx) : rawHtml + bar;
 }
 
 // ── Deleted / not found page ───────────────────────────────────────────────
@@ -631,7 +671,17 @@ a:hover{color:rgba(255,255,255,.6)}
 </html>`;
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────
+// ── IP helpers ─────────────────────────────────────────────────────────────
+function ipv6Prefix(ip) {
+  const halves = ip.split('::');
+  const left   = halves[0] ? halves[0].split(':') : [];
+  const right  = halves[1] ? halves[1].split(':') : [];
+  const fill   = 8 - left.length - right.length;
+  const full   = [...left, ...Array(fill).fill('0'), ...right];
+  return full.slice(0, 4).join(':');
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
 function html(body, status = 200) {
   return new Response(body, { status, headers: { 'Content-Type': 'text/html; charset=utf-8', 'X-Content-Type-Options': 'nosniff' } });
 }
