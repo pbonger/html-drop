@@ -24,9 +24,35 @@ scripts/sync-config.js  generates typed constants for each platform
 
 Routes: `POST /api/upload`, `GET /{uuid}`, `GET /delete/{uuid}?token=`, `GET /terms`, `GET /favicon.png`, `GET /icon.png`, `GET /apple-touch-icon.png`
 
-Encryption: PBKDF2-HMAC-SHA256 (100k iterations) + AES-256-GCM, server-side. Client sends raw HTML + password; server encrypts and generates the lock page. Browser decrypts via Web Crypto API.
+### Encryption
 
-KV storage: `page:{uuid}` → `{html, deleteToken, isProtected, createdAt}`, TTL 3 days.
+Every page is encrypted with AES-256-GCM (PBKDF2-HMAC-SHA256, 100k iterations). Decryption happens entirely in the browser via Web Crypto API.
+
+- **With password** — user-supplied password; shared URL has no key. Visitor enters password on the lock page.
+- **Without password** — random 32-byte key generated server-side; appended to the URL as `#key=<base64>`. Lock page auto-decrypts on load. Key is stored in `sessionStorage` so reloads work without re-entering anything. `history.replaceState` strips the key from the URL after first decrypt; sessionStorage takes over for subsequent loads.
+
+### KV storage
+
+`page:{uuid}` → `{html, deleteToken, isProtected, createdAt, ip}`, TTL 3 days.
+
+`block:{ip}` → strike counter or permanent block:
+- `1` = blocked (admin or exhausted strikes)
+- `4`, `3`, `2` = strikes remaining; bad uploads decrement the counter
+
+### Upload validation
+
+Before encrypting, uploads are checked for:
+1. Valid HTML content (`/<[a-zA-Z]/`)
+2. Known obfuscation patterns (`eval(atob(`, `eval(unescape(`, etc.)
+3. Large encoded blocks (256+ consecutive base64-alphabet chars, after stripping data URIs)
+
+Violations trigger a strike against the uploader's IP. After 3 violations the IP is blocked.
+
+### IP blocking
+
+IPv4 addresses are used as-is. IPv6 is normalized to its `/64` prefix (first 4 groups) — one ISP allocation = one block key. Only IPv4 and IPv6 `/64` prefixes are stored; the raw IPv6 address is never the block key.
+
+The uploader's (normalized) IP is also stored in the page record for abuse lookups.
 
 ## WebStorm Plugin (`src/main/kotlin/htmldrop/`)
 
@@ -54,7 +80,18 @@ Size check happens before the dialog — files over limit show an error dialog i
 | `npm run worker:deploy` | sync + wrangler deploy |
 | `npm run worker:dev` | local worker at localhost:8787 |
 | `npm run worker:init` | first-time KV namespace setup |
+| `npm run worker:pages` | list all live pages with time remaining |
+| `npm run worker:purge` | delete all KV entries |
+| `npm run worker:inspect` | look up a page record by UUID (shows ip, createdAt — no html) |
+| `npm run worker:block` | block an IP and delete all their existing uploads |
+| `npm run worker:unblock` | remove an IP block |
 | `npm run release` | bump version, build all, push GitHub release |
+
+## Scripts (`scripts/`)
+
+- `sync-config.js` — generates platform constants from settings.json
+- `kv-ip.js` — powers `worker:block` and `worker:unblock`; normalizes IPv6 to /64 prefix; on block also scans and deletes all uploads from that IP
+- `kv-inspect.js` — powers `worker:inspect`; fetches a page record and prints metadata without the html field
 
 ## Domain
 
