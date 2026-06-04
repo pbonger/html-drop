@@ -710,5 +710,8 @@ function cors(response) {
 }
 
 function toB64(bytes) {
-  return btoa(String.fromCharCode(...bytes));
+  let str = '';
+  for (let i = 0; i < bytes.length; i += 8192)
+    str += String.fromCharCode(...bytes.subarray(i, i + 8192));
+  return btoa(str);
 }
