@@ -1,10 +1,10 @@
 {
   "name": "html-drop-plugin",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "WebStorm plugin — right-click any HTML file to share on HTML Drop",
   "scripts": {
     "install": "brew install openjdk@21 gradle gh || true && gh auth login && gradle wrapper --gradle-version 8.8",
-    "sync":   "node scripts/sync-config.js",
+    "sync": "node scripts/sync-config.js",
     "build": "npm run sync && JAVA_HOME=$(brew --prefix openjdk@21)/libexec/openjdk.jdk/Contents/Home ./gradlew buildPlugin",
     "icon": "APP=src/main/resources/icons/icon.png && ICONS=src/main/resources/icons && META=src/main/resources/META-INF && mkdir -p /tmp/html-drop.iconset && sips -z 16 16 $APP --out /tmp/html-drop.iconset/icon_16x16.png && sips -z 32 32 $APP --out /tmp/html-drop.iconset/icon_16x16@2x.png && sips -z 32 32 $APP --out /tmp/html-drop.iconset/icon_32x32.png && sips -z 64 64 $APP --out /tmp/html-drop.iconset/icon_32x32@2x.png && sips -z 128 128 $APP --out /tmp/html-drop.iconset/icon_128x128.png && sips -z 256 256 $APP --out /tmp/html-drop.iconset/icon_128x128@2x.png && sips -z 256 256 $APP --out /tmp/html-drop.iconset/icon_256x256.png && sips -z 512 512 $APP --out /tmp/html-drop.iconset/icon_256x256@2x.png && sips -z 512 512 $APP --out /tmp/html-drop.iconset/icon_512x512.png && sips -z 1024 1024 $APP --out /tmp/html-drop.iconset/icon_512x512@2x.png && iconutil -c icns /tmp/html-drop.iconset -o finder/icon.icns && cp finder/icon.icns finder/HTMLDrop.workflow/Contents/Resources/icon.icns && rm -rf /tmp/html-drop.iconset && magick $ICONS/icon_source.png -resize 16x16 $ICONS/icon16.png && magick $ICONS/icon_source.png -resize 32x32 $ICONS/icon16@2x.png && magick $ICONS/icon16.png -channel RGB -negate -channel RGB -evaluate set 65535 $ICONS/icon16_dark.png && magick $ICONS/icon16@2x.png -channel RGB -negate -channel RGB -evaluate set 65535 $ICONS/icon16_dark@2x.png && magick $APP -resize 40x40 $META/pluginIcon.png && magick $APP -resize 80x80 $META/pluginIcon@2x.png",
     "build:app": "npm run sync && npm run icon && cd finder && ./build-app.sh",
@@ -13,11 +13,10 @@
     "package:all": "VERSION=$(node -p \"require('./package.json').version\") && npm run package:pkg && mkdir -p build/release && cp build/distributions/html-drop-plugin-*.zip build/release/ && cp build/HTMLDrop.pkg build/release/ && cp INSTALL.md build/release/README.md && (cd build/release && zip -r ../html-drop-v$VERSION.zip . --exclude '*/.DS_Store' --exclude '*/_CodeSignature/*') && rm -rf build/release build/HTMLDrop.pkg",
     "package:dmg": "mkdir -p build && bash scripts/package-dmg.sh",
     "release": "git diff --quiet && git diff --cached --quiet || (echo 'Working tree is not clean. Commit or stash your changes first.' && exit 1) && git checkout master && git merge develop --no-edit && npm version patch && VERSION=$(node -p \"require('./package.json').version\") && sed -i '' \"s/version = \\\"[^\\\"]*\\\"/version = \\\"$VERSION\\\"/\" build.gradle.kts && git add build.gradle.kts && git commit --amend --no-edit && git push && git push --tags && rm -rf build && npm run build && npm run build:app && npm run package:dmg && gh release create v$VERSION build/HTMLDrop-v$VERSION.dmg --title \"HTML Drop v$VERSION\" --generate-notes && git checkout develop && git merge --ff-only master && git push",
-
-    "worker:init":    "wrangler kv namespace create PAGES && wrangler kv namespace create PAGES --preview",
-    "worker:dev":     "wrangler dev --config worker/wrangler.toml",
-    "worker:deploy":  "wrangler deploy --config worker/wrangler.toml",
-    "worker:logs":    "wrangler tail --config worker/wrangler.toml"
+    "worker:init": "wrangler kv namespace create PAGES && wrangler kv namespace create PAGES --preview",
+    "worker:dev": "wrangler dev --config worker/wrangler.toml",
+    "worker:deploy": "wrangler deploy --config worker/wrangler.toml",
+    "worker:logs": "wrangler tail --config worker/wrangler.toml"
   },
   "devDependencies": {
     "wrangler": "^4"
