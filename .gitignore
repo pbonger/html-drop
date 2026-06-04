@@ -23,3 +23,4 @@ src/main/resources/icons/icon16@2x.png
 src/main/resources/icons/icon16_dark.png
 src/main/resources/icons/icon16_dark@2x.png
 /node_modules/
+/.wrangler/
