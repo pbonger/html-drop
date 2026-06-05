@@ -185,7 +185,7 @@ a{color:#e8640a}
 <h2>2. Limits</h2>
 <p>Maximum page size is ${settings.maxUploadMb} MB. A maximum of ${settings.maxPagesPerIp} active pages are kept per IP address — when the limit is reached the oldest page is automatically removed to make room for the new one.</p>
 <h2>3. Content Removal</h2>
-<p>All pages are automatically deleted after 3 days. You may delete your page immediately using the delete link provided at upload. To report abusive content, email <a href="mailto:${ABUSE_EMAIL}">${ABUSE_EMAIL}</a> with the page URL.</p>
+<p>All pages are automatically deleted after 3 days. To report abusive content, email <a href="mailto:${ABUSE_EMAIL}">${ABUSE_EMAIL}</a> with the page URL.</p>
 <p>Uploads are automatically scanned for obfuscated or pre-encoded content. Uploads that trigger these checks are rejected. Repeat offenders may have their IP address blocked.</p>
 <h2>4. No Warranty</h2>
 <p>This service is provided as-is without any warranty. We do not guarantee uptime, availability, or data retention beyond the stated 3-day TTL.</p>
