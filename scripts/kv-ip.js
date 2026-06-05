@@ -23,25 +23,29 @@ rl.question(`IP to ${action}: `, raw => {
   if (action === 'block') {
     execSync(`${base} put "block:${ip}" 1`, { stdio: 'inherit' });
 
-    // Remove all existing uploads from this IP
-    console.log(`Scanning for uploads from ${ip}...`);
-    const listJson = execSync(`wrangler kv key list --binding PAGES --preview false --remote --config worker/wrangler.toml --prefix "page:"`, { encoding: 'utf8' });
-    const keys = JSON.parse(listJson);
-    const toDelete = [];
-    for (const k of keys) {
-      try {
-        const val = execSync(`${base} get "${k.name}"`, { encoding: 'utf8' });
-        const record = JSON.parse(val);
-        if (record.ip === ip) toDelete.push({ name: k.name });
-      } catch {}
-    }
-    if (toDelete.length === 0) {
+    // Use the ip: secondary index to find all uploads from this IP
+    console.log(`Scanning uploads from ${ip}…`);
+    const listJson = execSync(
+      `wrangler kv key list --binding PAGES --preview false --remote --config worker/wrangler.toml --prefix "ip:${ip}:"`,
+      { encoding: 'utf8' }
+    );
+    const indexKeys = JSON.parse(listJson);
+    if (indexKeys.length === 0) {
       console.log('No uploads found from this IP.');
     } else {
-      console.log(`Deleting ${toDelete.length} upload(s) from ${ip}...`);
+      // Delete page:{uuid} and ip:{ip}:{uuid} for each entry
+      const uuids = indexKeys.map(k => k.name.split(':').slice(2).join(':'));
+      const toDelete = [
+        ...uuids.map(id => ({ name: `page:${id}` })),
+        ...indexKeys.map(k => ({ name: k.name })),
+      ];
+      console.log(`Deleting ${uuids.length} upload(s) from ${ip}…`);
       const tmp = '/tmp/kv-delete-ip.json';
       fs.writeFileSync(tmp, JSON.stringify(toDelete));
-      execSync(`wrangler kv bulk delete --binding PAGES --preview false --remote --config worker/wrangler.toml ${tmp}`, { stdio: 'inherit' });
+      execSync(
+        `wrangler kv bulk delete --binding PAGES --preview false --remote --config worker/wrangler.toml ${tmp}`,
+        { stdio: 'inherit' }
+      );
     }
   } else {
     execSync(`${base} delete "block:${ip}"`, { stdio: 'inherit' });

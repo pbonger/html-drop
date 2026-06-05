@@ -70,6 +70,7 @@ class ShareOnHTMLDropAction : AnAction() {
         val request = HttpRequest.newBuilder()
             .uri(URI.create(UPLOAD_URL))
             .header("Content-Type", "application/json")
+            .header("X-Upload-Token", UPLOAD_SECRET)
             .POST(HttpRequest.BodyPublishers.ofString(json))
             .build()
         val retryDelays = listOf(5_000L, 15_000L, 45_000L)

@@ -40,7 +40,7 @@ export default {
     if (path === '/apple-touch-icon.png' && meth === 'GET') return serveIcon(APPLE_SRC);
     if (path === '/api/upload'           && meth === 'POST')  return upload(request, env);
     if (path === '/terms'                && meth === 'GET')   return terms();
-    if (path === '/'                     && meth === 'GET')   return root();
+    if (path === '/'                     && meth === 'GET')   return root(env);
     if (path.startsWith('/delete/')      && meth === 'GET')   return deletePage(url, env);
 
     const idMatch = path.match(/^\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i);
@@ -55,6 +55,8 @@ async function upload(request, env) {
   let body;
   try { body = await request.json(); }
   catch { return err(400, 'Invalid JSON'); }
+
+  if (request.headers.get('x-upload-token') !== env.UPLOAD_SECRET) return err(401, 'Unauthorized');
 
   const { html, password } = body;
 
@@ -91,6 +93,17 @@ async function upload(request, env) {
   const stripped = html.replace(/data:[a-z]+\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=]+/gi, '');
   if (/[A-Za-z0-9+/]{256,}/.test(stripped)) return strike('Content contains large encoded blocks');
 
+  // Enforce per-IP page limit — drop oldest (FIFO) if at limit
+  const ipList = await env.PAGES.list({ prefix: `ip:${ip}:` });
+  if (ipList.keys.length >= settings.maxPagesPerIp) {
+    const oldest = ipList.keys.sort((a, b) => (a.expiration ?? 0) - (b.expiration ?? 0))[0];
+    const oldId  = oldest.name.split(':').slice(2).join(':');
+    await Promise.all([
+      env.PAGES.delete(`page:${oldId}`),
+      env.PAGES.delete(oldest.name),
+    ]);
+  }
+
   const id          = crypto.randomUUID();
   const deleteToken = crypto.randomUUID();
 
@@ -107,7 +120,10 @@ async function upload(request, env) {
     pageUrl += `#key=${encodeURIComponent(randomKey)}`;
   }
 
-  await env.PAGES.put(`page:${id}`, JSON.stringify({ html: stored, deleteToken, isProtected: true, createdAt: new Date().toISOString(), ip }), { expirationTtl: KV_TTL });
+  await Promise.all([
+    env.PAGES.put(`page:${id}`, JSON.stringify({ html: stored, deleteToken, isProtected: true, createdAt: new Date().toISOString(), ip }), { expirationTtl: KV_TTL }),
+    env.PAGES.put(`ip:${ip}:${id}`, '1', { expirationTtl: KV_TTL }),
+  ]);
 
   return cors(Response.json({ url: pageUrl, deleteUrl: `${new URL(request.url).origin}/delete/${id}?token=${deleteToken}` }));
 }
@@ -129,7 +145,10 @@ async function deletePage(url, env) {
   if (!raw) return html(deletedPage('Page not found', 'This page has already been deleted or never existed.'));
   const record = JSON.parse(raw);
   if (record.deleteToken !== token) return err(403, 'Invalid delete token');
-  await env.PAGES.delete(`page:${id}`);
+  await Promise.all([
+    env.PAGES.delete(`page:${id}`),
+    env.PAGES.delete(`ip:${record.ip}:${id}`),
+  ]);
   return html(deletedPage('Page deleted', 'This page has been permanently deleted.'));
 }
 
@@ -163,21 +182,23 @@ a{color:#e8640a}
 <li>Constitutes child sexual abuse material (CSAM) — strictly prohibited</li>
 <li>Facilitates fraud or identity theft</li>
 </ul>
-<h2>2. Content Removal</h2>
-<p>All pages are automatically deleted after 3 days. Maximum page size is 3 MB. You may delete your page immediately using the delete link provided at upload. To report abusive content, email <a href="mailto:${ABUSE_EMAIL}">${ABUSE_EMAIL}</a> with the page URL.</p>
+<h2>2. Limits</h2>
+<p>Maximum page size is ${settings.maxUploadMb} MB. A maximum of ${settings.maxPagesPerIp} active pages are kept per IP address — when the limit is reached the oldest page is automatically removed to make room for the new one.</p>
+<h2>3. Content Removal</h2>
+<p>All pages are automatically deleted after 3 days. You may delete your page immediately using the delete link provided at upload. To report abusive content, email <a href="mailto:${ABUSE_EMAIL}">${ABUSE_EMAIL}</a> with the page URL.</p>
 <p>Uploads are automatically scanned for obfuscated or pre-encoded content. Uploads that trigger these checks are rejected. Repeat offenders may have their IP address blocked.</p>
-<h2>3. No Warranty</h2>
+<h2>4. No Warranty</h2>
 <p>This service is provided as-is without any warranty. We do not guarantee uptime, availability, or data retention beyond the stated 3-day TTL.</p>
-<h2>4. Privacy</h2>
+<h2>5. Privacy</h2>
 <p>We store the HTML content you upload, a deletion token, and the uploader's IP address for abuse prevention. We do not collect any other personal data or track users. All encrypted pages use AES-256-GCM; we cannot read their contents. All data is deleted after 3 days.</p>
-<h2>5. Operator</h2>
+<h2>6. Operator</h2>
 <p>Operated by Studio Bonkers. Abuse and legal inquiries: <a href="mailto:${ABUSE_EMAIL}">${ABUSE_EMAIL}</a>.</p>
 </body>
 </html>`);
 }
 
 // ── GET / ──────────────────────────────────────────────────────────────────
-function root() {
+function root(env) {
   return html(`<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -491,7 +512,7 @@ uploadBtn.addEventListener('click', async () => {
     if (password) body.password = password;
     const res = await fetch('/api/upload', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-Upload-Token': '${env.UPLOAD_SECRET}' },
       body: JSON.stringify(body),
     });
     clearInterval(tick);

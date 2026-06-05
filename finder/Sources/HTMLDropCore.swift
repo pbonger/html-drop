@@ -15,6 +15,7 @@ func htmlDropUpload(_ html: String, password: String = "") throws -> String {
     var req = URLRequest(url: URL(string: uploadURL)!)
     req.httpMethod = "POST"
     req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    req.setValue(uploadSecret, forHTTPHeaderField: "X-Upload-Token")
     req.httpBody = Data(json.utf8)
     let retryDelays: [TimeInterval] = [5, 15, 45]
     for (attempt, delay) in ([0] + retryDelays).enumerated() {

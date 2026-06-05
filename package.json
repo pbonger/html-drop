@@ -20,7 +20,7 @@
     "worker:block": "node scripts/kv-ip.js block",
     "worker:unblock": "node scripts/kv-ip.js unblock",
     "worker:dev": "wrangler dev --config worker/wrangler.toml",
-    "worker:deploy": "wrangler deploy --config worker/wrangler.toml",
+    "worker:deploy": "node -e \"process.stdout.write(require('./settings.local.json').uploadSecret)\" | wrangler secret put UPLOAD_SECRET --config worker/wrangler.toml && wrangler deploy --config worker/wrangler.toml",
     "worker:logs": "wrangler tail --config worker/wrangler.toml"
   },
   "devDependencies": {
