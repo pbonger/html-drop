@@ -627,10 +627,15 @@ button:hover{opacity:.88}
   <div class="title" id="t">This page is password protected</div>
   <div class="sub" id="s">Enter the password to unlock the content.</div>
   <input type="password" id="p" placeholder="Password" autofocus>
-  <button id="b" onclick="go(document.getElementById('p').value)">Unlock</button>
+  <button id="b">Unlock</button>
   <div class="err" id="e">Wrong password — try again.</div>
 </div>
 <script>
+// Wrapped in an IIFE so none of these bindings (S, I, C, b, go, ...) leak into the
+// global lexical environment. document.open() does NOT reset that environment, so a
+// leaked top-level const named C here would collide with a decrypted page's own
+// top-level const C and throw "Identifier already declared", aborting its scripts.
+(function(){
 const S='${salt}',I='${iv}',C='${ct}';
 const b=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
 const fragKey=new URLSearchParams(location.hash.slice(1)).get('key');
@@ -652,6 +657,7 @@ async function go(pw){
     document.getElementById('e').style.display='block';
   }
 }
+document.getElementById('b').addEventListener('click',()=>go(document.getElementById('p').value));
 const autoKey=fragKey||sessionStorage.getItem(sessKey);
 if(autoKey){
   document.getElementById('t').textContent='Decrypting…';
@@ -662,6 +668,7 @@ if(autoKey){
 }else{
   document.getElementById('p').addEventListener('keydown',e=>{if(e.key==='Enter')go(document.getElementById('p').value);});
 }
+})();
 </script>
 </body>
 </html>`;
