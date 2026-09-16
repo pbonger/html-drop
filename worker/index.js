@@ -648,6 +648,10 @@ async function go(pw){
     sessionStorage.setItem(sessKey,pw);
     if(fragKey)history.replaceState(null,'',location.pathname);
     document.open();document.write(new TextDecoder().decode(plain));document.close();
+    // Browsers don't re-scan <link rel="icon"> after a document.write swap, so the
+    // lock page's favicon sticks until a hashchange forces a re-read. Re-insert the
+    // page's own icon links to trigger the favicon fetch immediately.
+    requestAnimationFrame(()=>{document.querySelectorAll('link[rel*="icon"]').forEach(l=>{const c=l.cloneNode();l.remove();document.head.appendChild(c);});});
   }catch{
     sessionStorage.removeItem(sessKey);
     document.getElementById('t').textContent='This page is password protected';
