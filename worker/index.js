@@ -649,9 +649,13 @@ async function go(pw){
     if(fragKey)history.replaceState(null,'',location.pathname);
     document.open();document.write(new TextDecoder().decode(plain));document.close();
     // Browsers don't re-scan <link rel="icon"> after a document.write swap, so the
-    // lock page's favicon sticks until a hashchange forces a re-read. Re-insert the
-    // page's own icon links to trigger the favicon fetch immediately.
-    requestAnimationFrame(()=>{document.querySelectorAll('link[rel*="icon"]').forEach(l=>{const c=l.cloneNode();l.remove();document.head.appendChild(c);});});
+    // page's own favicon is ignored until a navigation forces a re-read. Nudge one
+    // with a throwaway hash navigation, then clean the URL back a frame later so the
+    // re-scan lands while the hash is still present.
+    requestAnimationFrame(()=>{
+      location.hash='_';
+      requestAnimationFrame(()=>history.replaceState(null,'',location.pathname+location.search));
+    });
   }catch{
     sessionStorage.removeItem(sessKey);
     document.getElementById('t').textContent='This page is password protected';
