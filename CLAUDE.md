@@ -2,6 +2,8 @@
 
 Right-click any `.html` file → share it as a link. Pages live for 3 days, max 3 MB.
 
+**What every Studio Bonkers project shares:** `../bonkers/docs/family/family.md`; the basics of an app: `../bonkers/docs/family/apps.md`. A lesson every project would hit goes there; one only this project hits goes here.
+
 ## Architecture
 
 Three clients, one backend, one config:
