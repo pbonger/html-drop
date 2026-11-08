@@ -18,7 +18,7 @@ worker/index.js         imports settings.json directly (and the version from pac
 build.gradle.kts        reads pluginId from settings.json, writes it into plugin.xml at build
 ```
 
-`package.json` holds the version; `npm run release` bumps it and copies it into `build.gradle.kts`.
+`package.json` holds the version; `npm run release` bumps it and copies it into `build.gradle.kts`, amending the version commit, then moves the tag onto the amended commit (`git tag -f`): without that the tag stayed on the commit before the amend, off master, `build.gradle.kts` a version behind (v1.0.2 to v1.0.9 were).
 
 **Always edit `settings.json`, never the generated files. Run `npm run sync` to propagate.**
 
