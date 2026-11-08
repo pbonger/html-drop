@@ -9,23 +9,25 @@ Right-click any `.html` file → share it as a link. Pages live for 3 days, max 
 Three clients, one backend, one config:
 
 ```
-settings.json           single source of truth (uploadUrl, maxUploadMb, maxPagesPerIp)
+settings.json           single source of truth (uploadUrl, maxUploadMb, maxPagesPerIp, pluginId)
 settings.local.json     gitignored — holds uploadSecret only
-scripts/sync-config.js  merges both, generates typed constants for each platform
-  → worker/config.js
+scripts/sync-config.js  merges both, generates typed constants for the native clients
   → src/main/kotlin/htmldrop/Constants.kt
   → finder/Sources/GeneratedConstants.swift
+worker/index.js         imports settings.json directly (and the version from package.json)
+build.gradle.kts        reads pluginId from settings.json, writes it into plugin.xml at build
 ```
+
+`package.json` holds the version; `npm run release` bumps it and copies it into `build.gradle.kts`.
 
 **Always edit `settings.json`, never the generated files. Run `npm run sync` to propagate.**
 
 ## Backend — Cloudflare Worker (`worker/`)
 
 - `index.js` — all routes, HTML templates, crypto, icon serving
-- `config.js` — generated constants (MAX_UPLOAD_MB)
 - `wrangler.toml` — KV binding, custom domain
 
-Routes: `POST /api/upload`, `GET /{uuid}`, `GET /delete/{uuid}?token=`, `GET /terms`, `GET /favicon.png`, `GET /icon.png`, `GET /apple-touch-icon.png`
+Routes: `POST /api/upload`, `GET /{uuid}`, `GET /delete/{uuid}?token=`, `GET /terms`, `GET /updatePlugins.xml`, `GET /favicon.png`, `GET /icon.png`, `GET /apple-touch-icon.png`
 
 ### Authentication
 
@@ -80,6 +82,12 @@ The uploader's (normalized) IP is also stored in the page record for abuse looku
 - `Constants.kt` — generated (UPLOAD_URL, MAX_UPLOAD_BYTES, UPLOAD_SECRET)
 
 Size check happens before the dialog — files over limit show an error dialog immediately.
+
+### Updates — plugin repository
+
+WebStorm 2026.3+ requires every third-party plugin to have an *update source* (Marketplace or a custom plugin repository). The `.pkg` postinstall unzips the plugin straight into WebStorm's plugins folder, so WebStorm has no source and shows "Cannot update plugin — Unable to identify where HTML Drop was installed from" on every project open. There is no "installed from disk" source.
+
+The fix is our own plugin repository: `GET /updatePlugins.xml` lists `pluginId` (settings.json) at the `package.json` version, pointing at `html-drop-plugin-{version}.zip` on the GitHub release. `npm run release` attaches that zip and deploys the worker after the release exists, so the listed version always has a download. Users add the URL once (Settings → Plugins → ⚙ → Manage Plugin Repositories) and pick it on the notice; WebStorm then updates the plugin itself. Once the source is set, WebStorm ignores Marketplace for this ID, so the bare `html-drop` ID can't be hijacked by a same-named Marketplace plugin.
 
 ## macOS App (`finder/`)
 

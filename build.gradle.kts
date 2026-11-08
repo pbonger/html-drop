@@ -6,6 +6,9 @@ plugins {
 group = "pim"
 version = "1.0.8"
 
+// Values shared with the worker and the macOS app
+val sharedSettings = groovy.json.JsonSlurper().parse(file("settings.json")) as Map<*, *>
+
 repositories {
     mavenCentral()
     intellijPlatform {
@@ -27,4 +30,7 @@ kotlin {
 intellijPlatform {
     instrumentCode = false
     buildSearchableOptions = false
+    pluginConfiguration {
+        id = sharedSettings["pluginId"] as String
+    }
 }

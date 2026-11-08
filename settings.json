@@ -1,5 +1,6 @@
 {
   "uploadUrl": "https://html-drop.studio-bonkers.nl/api/upload",
   "maxUploadMb": 3,
-  "maxPagesPerIp": 32
+  "maxPagesPerIp": 32,
+  "pluginId": "html-drop"
 }

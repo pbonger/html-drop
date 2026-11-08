@@ -13,6 +13,16 @@ Right-click any `.html` file to instantly share it. Works in **WebStorm** and **
 
 Right-click any `.html` file → **Share on HTML Drop**.
 
+### Updates
+
+WebStorm 2026.3 and later needs to know where each plugin comes from. Do this once:
+
+1. **Settings → Plugins** → ⚙️ gear icon → **Manage Plugin Repositories…**
+2. Click **+** and add `https://html-drop.studio-bonkers.nl/updatePlugins.xml`
+3. On the **Cannot update plugin** notice, click **Choose where to get updates from** and pick that repository for HTML Drop
+
+From then on WebStorm updates HTML Drop by itself.
+
 ---
 
 ## 2. Finder (macOS Share menu)

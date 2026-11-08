@@ -31,12 +31,13 @@ Single source of truth for all clients and the worker:
 ```json
 {
   "uploadUrl": "https://html-drop.studio-bonkers.nl/api/upload",
-  "maxUploadMb": 3
+  "maxUploadMb": 3,
+  "maxPagesPerIp": 32,
+  "pluginId": "html-drop"
 }
 ```
 
-Running `npm run sync` generates typed constants for each platform:
-- `worker/config.js` (JS)
+The worker imports `settings.json` directly. Gradle reads `pluginId` and writes it into the plugin's `plugin.xml` at build time. Running `npm run sync` generates typed constants for the native clients:
 - `src/main/kotlin/htmldrop/Constants.kt` (Kotlin)
 - `finder/Sources/GeneratedConstants.swift` (Swift)
 
@@ -69,6 +70,7 @@ Deployed at `html-drop.studio-bonkers.nl`. Handles all upload, serve, and delete
 - **GET `/{uuid}`** — serves the page; injects delete/abuse/terms footer
 - **GET `/delete/{uuid}?token=`** — permanent delete with single confirm
 - **GET `/terms`** — terms of use
+- **GET `/updatePlugins.xml`** — WebStorm plugin repository (latest version → zip on the GitHub release)
 - **GET `/favicon.png`**, `/icon.png`**, `/apple-touch-icon.png`** — icons
 
 Password-protected pages are encrypted server-side (PBKDF2-HMAC-SHA256 + AES-256-GCM). The server never stores the password; decryption happens in the browser.

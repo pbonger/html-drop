@@ -1,4 +1,5 @@
 import settings from "../settings.json";
+import { version } from "../package.json";
 
 const MAX_BYTES = settings.maxUploadMb * 1024 * 1024;
 
@@ -10,11 +11,13 @@ const MAX_BYTES = settings.maxUploadMb * 1024 * 1024;
  * Serve  : GET  /{uuid}
  * Delete : GET  /delete/{uuid}?token={deleteToken}
  * Terms  : GET  /terms
+ * Plugins: GET  /updatePlugins.xml  (WebStorm plugin repository)
  */
 
 const KV_TTL      = 3 * 24 * 60 * 60;   // 3 days in seconds
 const ABUSE_EMAIL = 'html-drop@studio-bonkers.nl';
 const BRAND       = 'HTML Drop';
+const GITHUB_REPO = 'pbonger/html-drop';
 
 const FAVICON_SRC = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAERlWElmTU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAA6ABAAMAAAABAAEAAKACAAQAAAABAAAAIKADAAQAAAABAAAAIAAAAACshmLzAAAFHklEQVRYCe2VaWwUZRjH/3PtfXXbbim0FeyBgqWKBJQ0XGIpKKCREqIYTQwR1Cgkxg+eGDExIRoNiUdCPL6oATQx4hHApEoEqraWcpSmlC1Qem3bPWZ2Z+fa8ZnFGL+43S6JxoQ3mbyZvPM+z+855v8A19d/nAHuWvzf3ri2SvCH2PjopXShdthCL7a07OPcJbWfpaLy84XasO4VDMBWa9sMzrmYBbfVHahrKBSiIICaFdvnB4pDrw9d7gc4weP1Bz4gAHchEAUAVARXrr73I1FK+WQpDs3QwbLCIn9o7u5/A4Bd89Qre2rn1s/r6WoHz3PgOAFSUoLL6d0meKu2TBViShm4qfmF7c1r1z147mwXkrEIGIah6C0TDNJpGT5P8C3wwTunApE3gGNmy9J1LQ/sMmHgXGcHTF0DTMs3m4VQVIVeWOqH0MfUDtPyhcgTIFTWvGHD3vp5NztPHD0KKTaODNXeNE16LA4GHMtBTolwODx1dm/ofQLIS2PyApjdvOXNNWtX1Zzs6MDl8AXoinwVwDDgd5oIujKEcHWlknH4fEXrfWVznswnC5MCuGauvm9FU9NDcar56c6TkCURqqJCU1V4bRq+WTmCF2f0Iqno1BMsMlQalfrB7fLtrKieXzMZxCQAMx1VtyzaGSorRdvPbRgZjsBtxhBgxiBJSdwWklGXuITWXgNzyjNwCDq0DIu0LMFQ1SK72//SNQF46xc2B4LBhq6TpzB4KYxVobD5ee1hbBJaIYoJ3F2aQHQ4hWOKF58siOP7JZexvJIylDERjU6AMbGhoXFNXS6InBlwB4vv12UR5XIXdlcdxnPJ/cz+Q+exp11AiT2Fle4JHBkGwrINjx/JYCBsYF9dBB/eMYZarwQpkXTZWGFdLgA+xyHHcWyDNn4BO5wHUTM0gh09PN4OV5P6+tFUpqMiPY4vIzaYrA2/Sg481u/Au/4RPOpJo/RGBZvOBaBqpYtz+MA/ApQuW+Y0NKMoqgKbj1dgqzuGl2sU3HnDKF49y2B5iY5YJImfYn54bCweWcDj6QoFRWMGdnWzeG/ABc1mUFOq5QUBRM4rhq/S0DJJERfdc/DEiA2fjvbhjZoINhfLWOpwoLUfGFTsKHOqeMZzBW3tMl7rc6BHdgG8QH+JDchkcvnPMY4Hjqc1lh+UxAlSPQV2uwet+iws7azGoXE3FgoivhoVyDiPCSmD5YcEbD4TQI/qoxLxJEwM/MEi8m8M5CLI1YSmyfDHVJsLyegQMiR5ArV1mnPjiuzFljY7vh5zWkpMTnQMaE4aTDZyTOpMM0KwO1BZWUmqGT1RKACM2OABlFTpqcQYqZ+YlV4OOvpEB/YOhjBuUKpNneAMSqVBkkyKSJLIcBxq6mYjEPClL4a7vy0YQDv9RbtpqAdRUQ95YoAgSGCopozlkLUmkTULDNqozpQhK3KGZkJo2nQsbmxET/eZA4DanQtg0oFhirF2ZvrcjWB5jxHpy0ZJbrORU4tnIaw5wNBYZinyQLAYy+5qQtfvv13p7mx9mI5i1wQAJTphpmIdXMmse1jB5crEhwAtlXVsTaC/nFPkTo8XofIq9PX2jPSe+nEjfdSVy7l1Zt3PbwnuW+0z5r8jOP1LDHEMWiJi/ePZAcRxPHibnZqQhyonvlMS/c+S0bP5GM4f4Ko1wVY6e72zrHqjybANeloO6CnJMFPiMPT0L5o8fgB6/Af61GqQvNZUAf5u1EEvHnqoC5H4c6ft+vqfZeAPgJYQEs+q4gUAAAAASUVORK5CYII=';    // 32px  — /favicon.png + /favicon.ico
 const ICON_SRC    = 'data:image/png;base64,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';   // 64px  — /icon.png, used in <img>
@@ -40,6 +43,7 @@ export default {
     if (path === '/apple-touch-icon.png' && meth === 'GET') return serveIcon(APPLE_SRC);
     if (path === '/api/upload'           && meth === 'POST')  return upload(request, env);
     if (path === '/terms'                && meth === 'GET')   return terms();
+    if (path === '/updatePlugins.xml'    && meth === 'GET')   return pluginRepository();
     if (path === '/'                     && meth === 'GET')   return root(env);
     if (path.startsWith('/delete/')      && meth === 'GET')   return deletePage(url, env);
 
@@ -150,6 +154,21 @@ async function deletePage(url, env) {
     env.PAGES.delete(`ip:${record.ip}:${id}`),
   ]);
   return html(deletedPage('Page deleted', 'This page has been permanently deleted.'));
+}
+
+// ── GET /updatePlugins.xml ─────────────────────────────────────────────────
+// WebStorm custom plugin repository: lets WebStorm know where HTML Drop comes from and
+// update it. The zip is attached to each GitHub release by `npm run release`; its name
+// comes from rootProject.name in settings.gradle.kts.
+function pluginRepository() {
+  const zipUrl = `https://github.com/${GITHUB_REPO}/releases/download/v${version}/html-drop-plugin-${version}.zip`;
+  return new Response(`<?xml version="1.0" encoding="UTF-8"?>
+<plugins>
+  <plugin id="${settings.pluginId}" url="${zipUrl}" version="${version}">
+    <name>${BRAND}</name>
+  </plugin>
+</plugins>
+`, { headers: { 'Content-Type': 'application/xml; charset=utf-8' } });
 }
 
 // ── GET /terms ─────────────────────────────────────────────────────────────
@@ -316,7 +335,7 @@ footer a:hover{color:rgba(255,255,255,.6)}
     <span style="font-size:.8rem;color:rgba(255,255,255,.25);letter-spacing:.08em;text-transform:uppercase">Download here</span>
   </div>
   <div style="text-align:center">
-    <a id="dlPkg" class="btn-dl" href="https://github.com/pbonger/html-drop/releases/latest" target="_blank">
+    <a id="dlPkg" class="btn-dl" href="https://github.com/${GITHUB_REPO}/releases/latest" target="_blank">
 <img src="/icon.png" style="width:36px;height:36px;flex-shrink:0" alt="">
       <span style="flex:1;text-align:left">
         <span style="display:block;font-weight:700">Download <span id="dlPkgSub">HTMLDrop</span></span>
@@ -568,7 +587,7 @@ copyBtn.addEventListener('click', () => {
 });
 
 // Fetch latest release from GitHub
-fetch('https://api.github.com/repos/pbonger/html-drop/releases/latest')
+fetch('https://api.github.com/repos/${GITHUB_REPO}/releases/latest')
   .then(r => r.json())
   .then(rel => {
     const dmg = rel.assets?.find(a => a.name.endsWith('.dmg'));
