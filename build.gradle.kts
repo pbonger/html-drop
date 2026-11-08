@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "pim"
-version = "1.0.8"
+version = "1.0.9"
 
 // Values shared with the worker and the macOS app
 val sharedSettings = groovy.json.JsonSlurper().parse(file("settings.json")) as Map<*, *>
